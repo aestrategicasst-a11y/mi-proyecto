@@ -1,0 +1,595 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>OptiRuta SST - Simulador de Control Operacional y Gestión de Calidad</title>
+  
+  <!-- Tailwind CSS vía CDN para estilos rápidos, modernos y responsivos -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  
+  <!-- Font Awesome vía CDN para iconografía técnica y semafórica -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  
+  <!-- Chart.js vía CDN para gráficos interactivos de proyección operacional -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body class="bg-slate-100 text-slate-800 font-sans min-h-screen flex flex-col antialiased">
+
+  <!-- ENCABEZADO INSTITUCIONAL Y TÉCNICO -->
+  <header class="bg-slate-900 text-white shadow-lg border-b border-slate-800 sticky top-0 z-40">
+    <div class="max-w-7xl mx-auto px-4 py-3.5 flex flex-col md:flex-row justify-between items-center gap-3">
+      <div class="flex items-center gap-3">
+        <div class="w-10 h-10 rounded-lg bg-blue-600 flex items-center justify-center text-white shadow">
+          <i class="fa-solid fa-route text-lg"></i>
+        </div>
+        <div>
+          <h1 class="text-lg md:text-xl font-bold tracking-tight text-white flex items-center gap-2">
+            OptiRuta SST <span class="text-xs font-semibold px-2 py-0.5 rounded bg-blue-900/80 text-blue-300 border border-blue-700">v2.5 Poka-Yoke</span>
+          </h1>
+          <p class="text-xs text-slate-400">Control Operacional de Horas Técnicas en Transporte Público | Galapa, Atlántico</p>
+        </div>
+      </div>
+
+      <!-- Indicadores de cabecera y botón de exportación (Bono 1) -->
+      <div class="flex flex-wrap items-center gap-2.5">
+        <div class="hidden sm:flex items-center gap-2 bg-slate-800 px-3 py-1.5 rounded-lg border border-slate-700 text-xs">
+          <span class="w-2 h-2 rounded-full bg-emerald-400 animate-ping"></span>
+          <span class="text-slate-300">Base: Galapa</span>
+          <span class="text-slate-500">|</span>
+          <span class="text-amber-400 font-medium">Extra: $15.000/h (>160.5h)</span>
+        </div>
+        <button onclick="exportarReporteAuditoriaCSV()" class="bg-emerald-600 hover:bg-emerald-500 active:scale-95 text-white text-xs font-semibold px-3.5 py-2 rounded-lg flex items-center gap-1.5 transition shadow cursor-pointer">
+          <i class="fa-solid fa-file-csv text-sm"></i> Exportar Auditoría (CSV)
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <!-- CONTENEDOR PRINCIPAL DEL ARTEFACTO -->
+  <main class="max-w-7xl mx-auto p-4 md:p-6 grid grid-cols-1 lg:grid-cols-12 gap-6 flex-grow w-full">
+    
+    <!-- COLUMNA IZQUIERDA: PANEL DE ENTRADAS Y SIMULACIÓN (4 columnas) -->
+    <section class="lg:col-span-4 bg-white rounded-2xl shadow-sm border border-slate-200 p-5 space-y-5">
+      <div class="border-b border-slate-100 pb-3 flex items-center justify-between">
+        <h2 class="text-sm font-bold uppercase tracking-wider text-slate-700 flex items-center gap-2">
+          <i class="fa-solid fa-sliders text-blue-600"></i> Parámetros de la Jornada
+        </h2>
+        <span class="text-[10px] font-semibold bg-slate-100 text-slate-600 px-2 py-0.5 rounded">Noviembre 2026</span>
+      </div>
+
+      <!-- Selector 1: Tipo de Jornada Laboral -->
+      <div>
+        <label for="tipoDia" class="block text-xs font-bold text-slate-700 mb-1.5">
+          1. TIPO DE DÍA (CALENDARIO DE 23 DÍAS HÁBILES)
+        </label>
+        <select id="tipoDia" onchange="ejecutarSimulacion()" class="w-full text-xs bg-slate-50 border border-slate-300 rounded-xl p-2.5 font-medium text-slate-800 focus:ring-2 focus:ring-blue-500 focus:bg-white outline-none transition">
+          <option value="LJ">Lunes a Jueves (15 días en el mes | Meta base: 7.5h - 9.5h)</option>
+          <option value="VIE">Viernes (4 días en el mes | Meta estándar: 8.0h)</option>
+          <option value="SAB">Sábado (4 días en el mes | Meta estándar: 4.0h)</option>
+        </select>
+        <p class="text-[10px] text-slate-500 mt-1">Define la cuota diaria programada según el cronograma contractual.</p>
+      </div>
+
+      <!-- Selector 2: Nivel de Exigencia Mensual -->
+      <div>
+        <label for="nivelMeta" class="block text-xs font-bold text-slate-700 mb-1.5">
+          2. NIVEL DE EXIGENCIA MENSUAL
+        </label>
+        <select id="nivelMeta" onchange="ejecutarSimulacion()" class="w-full text-xs bg-slate-50 border border-slate-300 rounded-xl p-2.5 font-medium text-slate-800 focus:ring-2 focus:ring-blue-500 focus:bg-white outline-none transition">
+          <option value="min">Mínimo Contractual (160.5 h/mes - Umbral para activar Horas Extras)</option>
+          <option value="prom" selected>Promedio Estándar (175.5 h/mes - Productividad Esperada)</option>
+          <option value="max">Máximo de Eficiencia (190.5 h/mes - Capacidad Teórica)</option>
+        </select>
+      </div>
+
+      <!-- Deslizador 1: Horas de Asesoría Presencial In Situ -->
+      <div class="bg-blue-50/60 p-3.5 rounded-xl border border-blue-100 space-y-1.5">
+        <div class="flex justify-between items-center text-xs font-bold">
+          <span class="text-blue-900 flex items-center gap-1.5">
+            <i class="fa-solid fa-briefcase text-blue-600"></i> HORAS TÉCNICAS IN SITU (Hr):
+          </span>
+          <span id="labelHorasSitio" class="text-blue-700 text-sm font-black bg-blue-100 px-2 py-0.5 rounded-lg">7.0 h</span>
+        </div>
+        <input type="range" id="sliderHorasSitio" min="1.0" max="11.0" step="0.5" value="7.0" oninput="ejecutarSimulacion()"
+               class="w-full h-2 bg-blue-200 rounded-lg appearance-none cursor-pointer accent-blue-600">
+        <div class="flex justify-between text-[10px] text-blue-700/70 font-semibold">
+          <span>1.0h</span>
+          <span>Umbral: 7.5h</span>
+          <span>11.0h</span>
+        </div>
+      </div>
+
+      <!-- Deslizador 2: Tiempo en Transporte Público (No Reportable) -->
+      <div class="bg-amber-50/60 p-3.5 rounded-xl border border-amber-100 space-y-1.5">
+        <div class="flex justify-between items-center text-xs font-bold">
+          <span class="text-amber-900 flex items-center gap-1.5">
+            <i class="fa-solid fa-bus text-amber-600"></i> TRANSPORTE PÚBLICO (Td):
+          </span>
+          <span id="labelTiempoTraslado" class="text-amber-800 text-sm font-black bg-amber-100 px-2 py-0.5 rounded-lg">2.5 h</span>
+        </div>
+        <input type="range" id="sliderTiempoTraslado" min="0.0" max="5.0" step="0.5" value="2.5" oninput="ejecutarSimulacion()"
+               class="w-full h-2 bg-amber-200 rounded-lg appearance-none cursor-pointer accent-amber-600">
+        <div class="flex justify-between text-[10px] text-amber-800/70 font-semibold">
+          <span>0.0h (Directo)</span>
+          <span>PCO-1: Máx 2.0h</span>
+          <span>5.0h (Crítico)</span>
+        </div>
+      </div>
+
+      <!-- Deslizador 3: Número de Empresas Asignadas -->
+      <div class="bg-slate-50 p-3.5 rounded-xl border border-slate-200 space-y-1.5">
+        <div class="flex justify-between items-center text-xs font-bold">
+          <span class="text-slate-700 flex items-center gap-1.5">
+            <i class="fa-solid fa-building text-slate-500"></i> EMPRESAS ASIGNADAS (n):
+          </span>
+          <span id="labelNumEmpresas" class="text-slate-800 text-sm font-black bg-slate-200 px-2 py-0.5 rounded-lg">3 sedes</span>
+        </div>
+        <input type="range" id="sliderNumEmpresas" min="1" max="4" step="1" value="3" oninput="ejecutarSimulacion()"
+               class="w-full h-2 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-slate-600">
+        <div class="flex justify-between text-[10px] text-slate-500 font-semibold">
+          <span>1 sede</span>
+          <span>2 a 3 (Óptimo)</span>
+          <span>4 (Sobresaturado)</span>
+        </div>
+      </div>
+
+      <!-- Botón de Activación Asistente Poka-Yoke (Bono 3) -->
+      <button onclick="abrirModalPokaYoke()" id="btnPokaYoke" class="w-full py-3 px-4 rounded-xl font-bold text-xs flex items-center justify-center gap-2 transition duration-200 shadow-sm cursor-not-allowed bg-slate-100 text-slate-400 border border-slate-200" disabled>
+        <i class="fa-solid fa-shield-halved"></i> ASISTENTE POKA-YOKE (RUTA PROTEGIDA)
+      </button>
+
+      <!-- Resumen de Costo de No Calidad Unitario -->
+      <div class="p-3 rounded-xl bg-slate-50 border border-slate-200 text-[11px] text-slate-600 space-y-1">
+        <div class="flex justify-between">
+          <span>Tarifa hora adicional (>160.5h):</span>
+          <strong class="text-emerald-700">$15.000 COP</strong>
+        </div>
+        <div class="flex justify-between">
+          <span>Costo unitario por evento (Cu):</span>
+          <strong class="text-red-700">$50.000 COP</strong>
+        </div>
+      </div>
+    </section>
+
+    <!-- COLUMNA CENTRAL Y DERECHA: RESULTADOS, SEMÁFORO Y KPIS (8 columnas) -->
+    <section class="lg:col-span-8 space-y-6">
+      
+      <!-- 1. SEMÁFORO DE SALUD DEL PROCESO OPERACIONAL (PCO-1 & PCO-2) -->
+      <div id="contenedorSemaforo" class="p-5 md:p-6 rounded-2xl border transition-all duration-300 shadow-sm bg-emerald-50 border-emerald-300">
+        <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+          <div class="flex items-center gap-4">
+            <div id="circuloIconoSemaforo" class="w-14 h-14 rounded-2xl flex items-center justify-center text-white text-2xl shadow-md bg-emerald-500">
+              <i class="fa-solid fa-check"></i>
+            </div>
+            <div>
+              <span id="badgeEstadoSemaforo" class="text-[11px] font-black uppercase tracking-wider px-3 py-1 rounded-full bg-emerald-100 text-emerald-800 border border-emerald-200">
+                OPERACIÓN CONFORME
+              </span>
+              <h3 id="tituloEstadoSemaforo" class="text-lg md:text-xl font-extrabold text-slate-800 mt-1">
+                Ruta en Transporte Público Viable
+              </h3>
+            </div>
+          </div>
+          
+          <!-- Brecha operacional en tiempo real -->
+          <div class="bg-white/80 backdrop-blur-sm p-3 rounded-xl border border-slate-200/80 text-right min-w-[140px]">
+            <p class="text-[10px] uppercase font-bold text-slate-500">Brecha Jornada Diaria</p>
+            <p id="valorBrechaDiaria" class="text-2xl font-black text-emerald-700">+0.0 h</p>
+          </div>
+        </div>
+
+        <p id="descripcionDiagnostico" class="text-xs text-slate-700 mt-3 pt-3 border-t border-slate-200/60 leading-relaxed font-medium">
+          Las conexiones de transporte público permiten cumplir con la cuota de horas contractuales sin incurrir en déficit ni tiempos de reproceso.
+        </p>
+      </div>
+
+      <!-- 2. TARJETAS DE KPIS OPERATIVOS Y FINANCIEROS DEL DÍA -->
+      <div class="grid grid-cols-2 sm:grid-cols-4 gap-3.5">
+        
+        <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex flex-col justify-between">
+          <span class="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Horas Reportables</span>
+          <p id="kpiHorasReportables" class="text-xl font-black text-slate-800 my-1">7.0 h</p>
+          <span id="kpiMetaReferencia" class="text-[10px] text-blue-600 font-semibold">Meta: 8.5 h</span>
+        </div>
+
+        <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex flex-col justify-between">
+          <span class="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Jornada Total (Bruta)</span>
+          <p id="kpiJornadaBruta" class="text-xl font-black text-slate-800 my-1">9.5 h</p>
+          <span class="text-[10px] text-slate-500">Sitio + Transporte público</span>
+        </div>
+
+        <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex flex-col justify-between">
+          <span class="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Horas Adicionales Día</span>
+          <p id="kpiHorasExtrasDia" class="text-xl font-black text-emerald-600 my-1">0.0 h</p>
+          <span class="text-[10px] text-emerald-700 font-semibold">Excedente > Meta Mín</span>
+        </div>
+
+        <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex flex-col justify-between">
+          <span class="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Incentivo Extra Día</span>
+          <p id="kpiPagoExtrasDia" class="text-xl font-black text-emerald-600 my-1">$ 0</p>
+          <span class="text-[10px] text-slate-500">Tarifa: $15.000/h</span>
+        </div>
+
+      </div>
+
+      <!-- 3. MÓDULO DE PROYECCIÓN MENSUAL Y AUDITORÍA DE INCENTIVOS (PCO-3) -->
+      <div class="bg-white rounded-2xl border border-slate-200 shadow-sm p-5 space-y-4">
+        <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2 border-b border-slate-100 pb-3">
+          <div>
+            <h3 class="text-sm font-extrabold text-slate-800 flex items-center gap-2">
+              <i class="fa-solid fa-chart-pie text-blue-600"></i> Proyección Acumulada del Mes (Noviembre - 23 Días Hábiles)
+            </h3>
+            <p class="text-xs text-slate-400">15 días de Lunes a Jueves, 4 Viernes y 4 Sábados</p>
+          </div>
+          <span id="badgeEstadoMetaMes" class="text-xs px-3 py-1 rounded-full font-bold bg-blue-100 text-blue-800">
+            En Monitoreo Operacional
+          </span>
+        </div>
+
+        <!-- Barra de progreso hacia la meta mínima de 160.5 horas -->
+        <div class="space-y-1.5">
+          <div class="flex justify-between text-xs font-bold">
+            <span class="text-slate-600">Progreso hacia el Umbral Contractual (160.5 h):</span>
+            <span id="labelPorcentajeMeta" class="text-blue-600 font-black">0%</span>
+          </div>
+          <div class="w-full bg-slate-100 rounded-full h-3.5 overflow-hidden p-0.5 border border-slate-200">
+            <div id="barraProgresoMeta" class="bg-gradient-to-r from-blue-600 to-indigo-600 h-full rounded-full transition-all duration-500" style="width: 50%"></div>
+          </div>
+        </div>
+
+        <!-- Tarjetas financieras de cierre de mes -->
+        <div class="grid grid-cols-1 sm:grid-cols-3 gap-3.5 pt-2">
+          
+          <div class="bg-slate-50 p-3.5 rounded-xl border border-slate-200 text-center">
+            <span class="text-[10px] font-bold text-slate-500 uppercase">Horas Totales Estimadas</span>
+            <p id="totalHorasMesProyectadas" class="text-lg font-black text-slate-800 mt-0.5">0 h</p>
+            <span id="subMetaMesReferencia" class="text-[10px] text-slate-500 font-medium">Meta Mínima: 160.5 h</span>
+          </div>
+
+          <div class="bg-emerald-50/70 p-3.5 rounded-xl border border-emerald-200 text-center">
+            <span class="text-[10px] font-bold text-emerald-800 uppercase">Incentivo Horas Adicionales</span>
+            <p id="totalIncentivoMesPesos" class="text-lg font-black text-emerald-700 mt-0.5">$ 0</p>
+            <span id="labelHorasExtrasGanadas" class="text-[10px] text-emerald-600 font-semibold">0 h adicionales acumuladas</span>
+          </div>
+
+          <div class="bg-red-50/70 p-3.5 rounded-xl border border-red-200 text-center">
+            <span class="text-[10px] font-bold text-red-800 uppercase">Lucro Cesante / Costo CNQ</span>
+            <p id="totalLucroCesanteMesPesos" class="text-lg font-black text-red-700 mt-0.5">$ 0</p>
+            <span id="labelHorasPerdidasBus" class="text-[10px] text-red-600 font-semibold">Tiempo perdido en transporte</span>
+          </div>
+
+        </div>
+
+        <!-- Gráfico dinámico de balance horario -->
+        <div class="pt-2 border-t border-slate-100">
+          <canvas id="graficoBalance" class="w-full max-h-48"></canvas>
+        </div>
+      </div>
+
+    </section>
+
+  </main>
+
+  <!-- MODAL POKA-YOKE: WIZARD DE CONTINGENCIA MULTINIVEL (BONO DE INNOVACIÓN 3) -->
+  <div id="modalPokaYoke" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm hidden items-center justify-center p-4 z-50 transition-opacity duration-200">
+    <div class="bg-white rounded-2xl max-w-xl w-full p-6 shadow-2xl border border-slate-200 animate-in fade-in zoom-in duration-150">
+      
+      <!-- Cabecera del Wizard -->
+      <div class="flex justify-between items-center border-b border-slate-100 pb-3">
+        <div class="flex items-center gap-2 text-red-600">
+          <i class="fa-solid fa-triangle-exclamation text-xl"></i>
+          <h3 class="text-base font-extrabold text-slate-800">
+            Asistente Poka-Yoke: Protocolo de Contención Logística
+          </h3>
+        </div>
+        <button onclick="cerrarModalPokaYoke()" class="text-slate-400 hover:text-slate-600 text-xl font-bold p-1 cursor-pointer">
+          <i class="fa-solid fa-xmark"></i>
+        </button>
+      </div>
+
+      <!-- Contenido secuencial del Wizard -->
+      <div class="mt-4 space-y-3.5">
+        <p class="text-xs text-slate-600">
+          Se ha detectado una fricción de transporte público o un déficit de tiempo presencial in situ frente a la meta programada. Ejecute el siguiente escalamiento operativo:
+        </p>
+
+        <!-- Nivel 1 -->
+        <div class="bg-red-50 border border-red-200 rounded-xl p-3.5 text-xs text-red-900 space-y-1">
+          <p class="font-extrabold flex items-center gap-2">
+            <span class="w-5 h-5 rounded-full bg-red-600 text-white flex items-center justify-center text-[10px]">1</span>
+            Paso 1: Bloqueo de Ruta Inviable (PCO-1)
+          </p>
+          <p class="text-slate-600 pl-7">
+            Reagrupe inmediatamente las empresas asignadas sobre un único corredor vial directo (ej. solo Vía 40 o solo salidas intermunicipales sur). Suprima visitas cruzadas que requieran más de un transbordo desde Galapa.
+          </p>
+        </div>
+
+        <!-- Nivel 2 -->
+        <div class="bg-amber-50 border border-amber-200 rounded-xl p-3.5 text-xs text-amber-900 space-y-1">
+          <p class="font-extrabold flex items-center gap-2">
+            <span class="w-5 h-5 rounded-full bg-amber-600 text-white flex items-center justify-center text-[10px]">2</span>
+            Paso 2: Ajuste Técnico Dinámico In Situ (PCO-2)
+          </p>
+          <p class="text-slate-600 pl-7">
+            Si hubo demoras de bus al llegar a la empresa 1, priorice únicamente la inspección de riesgos críticos no tolerables y la firma del acta presencial para asegurar al menos el umbral mínimo de horas diarias.
+          </p>
+        </div>
+
+        <!-- Nivel 3 -->
+        <div class="bg-blue-50 border border-blue-200 rounded-xl p-3.5 text-xs text-blue-900 space-y-1">
+          <p class="font-extrabold flex items-center gap-2">
+            <span class="w-5 h-5 rounded-full bg-blue-600 text-white flex items-center justify-center text-[10px]">3</span>
+            Paso 3: Salvaguarda del Piso Contractual y Horas Extras (PCO-3)
+          </p>
+          <p class="text-slate-600 pl-7">
+            Programe una sesión de compensación técnica sincrónica virtual o reagrupamiento en sábado (meta 4.0h) para mantener el acumulado mensual por encima de 160.5 horas y no perder la tarifa de $15.000 COP/h adicional.
+          </p>
+        </div>
+      </div>
+
+      <!-- Pie del Modal -->
+      <div class="mt-5 pt-3 border-t border-slate-100 flex justify-end gap-2">
+        <button onclick="cerrarModalPokaYoke()" class="bg-slate-800 hover:bg-slate-700 text-white text-xs font-bold px-4 py-2.5 rounded-xl transition shadow cursor-pointer">
+          Protocolo Aplicado y Entendido
+        </button>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- PIE DE PÁGINA ACADÉMICO -->
+  <footer class="bg-white border-t border-slate-200 text-center py-4 text-xs text-slate-500 mt-auto">
+    <div class="max-w-7xl mx-auto px-4 flex flex-col sm:flex-row justify-between items-center gap-2">
+      <p><strong>Estudiante:</strong> Neiris Marcela Pallares Carreño | Maestría en Gestión de la Calidad Integral</p>
+      <p><strong>Docente:</strong> Alessandro Villanueva Cantillo | Universidad Americana</p>
+    </div>
+  </footer>
+
+  <!-- LÓGICA DE CONTROL OPERACIONAL Y SIMULACIÓN EN JAVASCRIPT -->
+  <script>
+    // REGLAS CONTRACTUALES DE NOVIEMBRE (23 DÍAS HÁBILES)
+    const DIAS_LABORALES = { LJ: 15, VIE: 4, SAB: 4, total: 23 };
+    const META_MINIMA_PISO = 160.5; // Umbral contractual indispensable para liquidar extras
+    const TARIFA_HORA_EXTRA = 15000; // Tarifa por hora adicional superando el piso
+    const COSTO_UNITARIO_NO_CALIDAD = 50000; // Cu por evento de falla (lucro cesante + sobrecosto logístico)
+
+    // Matriz de metas diarias según nivel de exigencia
+    const TABLA_METAS = {
+      min: { LJ: 7.5, VIE: 8.0, SAB: 4.0, total: 160.5 },
+      prom: { LJ: 8.5, VIE: 8.0, SAB: 4.0, total: 175.5 },
+      max: { LJ: 9.5, VIE: 8.0, SAB: 4.0, total: 190.5 }
+    };
+
+    let chartInstancia = null;
+
+    // Función principal de cálculo y actualización de la interfaz
+    function ejecutarSimulacion() {
+      // 1. Obtener valores de los controles
+      const tipoDia = document.getElementById("tipoDia").value;
+      const nivelMeta = document.getElementById("nivelMeta").value;
+      const horasSitio = parseFloat(document.getElementById("sliderHorasSitio").value);
+      const tiempoTraslado = parseFloat(document.getElementById("sliderTiempoTraslado").value);
+      const numEmpresas = parseInt(document.getElementById("sliderNumEmpresas").value);
+
+      // 2. Actualizar etiquetas numéricas de los sliders
+      document.getElementById("labelHorasSitio").innerText = horasSitio.toFixed(1) + " h";
+      document.getElementById("labelTiempoTraslado").innerText = tiempoTraslado.toFixed(1) + " h";
+      document.getElementById("labelNumEmpresas").innerText = numEmpresas + (numEmpresas === 1 ? " sede" : " sedes");
+
+      // 3. Cálculos de la jornada evaluada
+      const metaDiaria = TABLA_METAS[nivelMeta][tipoDia];
+      const brechaDiaria = horasSitio - metaDiaria;
+      const jornadaBruta = horasSitio + tiempoTraslado;
+
+      // 4. Actualizar KPIs del día
+      document.getElementById("kpiHorasReportables").innerText = horasSitio.toFixed(1) + " h";
+      document.getElementById("kpiMetaReferencia").innerText = `Meta: ${metaDiaria.toFixed(1)} h`;
+      document.getElementById("kpiJornadaBruta").innerText = jornadaBruta.toFixed(1) + " h";
+
+      // Horas extras del día (si supera la meta diaria de referencia)
+      const horasExtrasDia = Math.max(0, horasSitio - metaDiaria);
+      const pagoExtrasDia = horasExtrasDia * TARIFA_HORA_EXTRA;
+      document.getElementById("kpiHorasExtrasDia").innerText = horasExtrasDia.toFixed(1) + " h";
+      document.getElementById("kpiPagoExtrasDia").innerText = "$ " + Math.round(pagoExtrasDia).toLocaleString("es-CO");
+
+      // 5. Proyección mensual consolidada (asumiendo 8 días críticos con patrón actual y 15 días estándar)
+      // Bloque fijo Viernes (4 * 8h = 32h) y Sábados (4 * 4h = 16h) = 48h
+      const horasFijasViernesSabados = (4 * 8.0) + (4 * 4.0);
+      // Bloque L-J (15 días): 8 días con el rendimiento evaluado y 7 días a meta estándar
+      const horasMesLJ = (horasSitio * 8) + (metaDiaria * 7);
+      const totalHorasMes = horasMesLJ + horasFijasViernesSabados;
+
+      // Cálculo de Horas Adicionales Mensuales (> 160.5h)
+      let horasAdicionalesMes = 0;
+      let ingresoExtrasMes = 0;
+      if (totalHorasMes > META_MINIMA_PISO) {
+        horasAdicionalesMes = totalHorasMes - META_MINIMA_PISO;
+        ingresoExtrasMes = horasAdicionalesMes * TARIFA_HORA_EXTRA;
+      }
+
+      // Cálculo de Lucro Cesante mensual derivado del tiempo en transporte público
+      // Horas perdidas por traslados que excedan 1.0h en las 8 jornadas críticas
+      const horasPerdidasPorTransporte = Math.max(0, (tiempoTraslado - 1.0)) * 8;
+      const lucroCesanteDinero = horasPerdidasPorTransporte * TARIFA_HORA_EXTRA;
+
+      // Actualizar tarjeta mensual
+      document.getElementById("totalHorasMesProyectadas").innerText = totalHorasMes.toFixed(1) + " h";
+      document.getElementById("totalIncentivoMesPesos").innerText = "$ " + Math.round(ingresoExtrasMes).toLocaleString("es-CO");
+      document.getElementById("labelHorasExtrasGanadas").innerText = `${horasAdicionalesMes.toFixed(1)} h adicionales acumuladas`;
+      document.getElementById("totalLucroCesanteMesPesos").innerText = "$ " + Math.round(lucroCesanteDinero).toLocaleString("es-CO");
+      document.getElementById("labelHorasPerdidasBus").innerText = `${horasPerdidasPorTransporte.toFixed(1)} h perdidas en traslados`;
+
+      const porcentajeCumplimiento = Math.min(100, Math.round((totalHorasMes / META_MINIMA_PISO) * 100));
+      document.getElementById("labelPorcentajeMeta").innerText = porcentajeCumplimiento + "%";
+      document.getElementById("barraProgresoMeta").style.width = porcentajeCumplimiento + "%";
+
+      // 6. Lógica de Semáforo Operacional y Activador Poka-Yoke
+      const contenedor = document.getElementById("contenedorSemaforo");
+      const circulo = document.getElementById("circuloIconoSemaforo");
+      const badge = document.getElementById("badgeEstadoSemaforo");
+      const titulo = document.getElementById("tituloEstadoSemaforo");
+      const descrip = document.getElementById("descripcionDiagnostico");
+      const textoBrecha = document.getElementById("valorBrechaDiaria");
+      const btnPoka = document.getElementById("btnPokaYoke");
+      const badgeMes = document.getElementById("badgeEstadoMetaMes");
+
+      textoBrecha.innerText = (brechaDiaria >= 0 ? "+" : "") + brechaDiaria.toFixed(1) + " h";
+
+      // Condiciones técnicas de semáforo
+      const esVerde = (brechaDiaria >= 0 && tiempoTraslado <= 2.0 && jornadaBruta <= 10.5);
+      const esAmbar = (!esVerde && (brechaDiaria >= -1.0 && jornadaBruta <= 11.5 && tiempoTraslado <= 3.0));
+
+      if (esVerde) {
+        // Estado VERDE: Óptimo
+        contenedor.className = "p-5 md:p-6 rounded-2xl border transition-all duration-300 shadow-sm bg-emerald-50 border-emerald-300";
+        circulo.className = "w-14 h-14 rounded-2xl flex items-center justify-center text-white text-2xl shadow-md bg-emerald-500";
+        circulo.innerHTML = '<i class="fa-solid fa-check"></i>';
+        badge.className = "text-[11px] font-black uppercase tracking-wider px-3 py-1 rounded-full bg-emerald-100 text-emerald-800 border border-emerald-200";
+        badge.innerText = "OPERACIÓN CONFORME / HABILITA EXTRAS";
+        titulo.innerText = "Ruta Viable: Meta Cubierta y Potencial de Horas Extras";
+        descrip.innerText = `La jornada cubre la meta diaria de ${metaDiaria.toFixed(1)} h. La proyección mensual supera el umbral de 160.5 h, garantizando la liquidación de horas adicionales a $15.000 COP/h.`;
+        textoBrecha.className = "text-2xl font-black text-emerald-700";
+
+        badgeMes.className = "text-xs px-3 py-1 rounded-full font-bold bg-emerald-100 text-emerald-800";
+        badgeMes.innerText = "Meta Asegurada";
+
+        btnPoka.disabled = true;
+        btnPoka.className = "w-full py-3 px-4 rounded-xl font-bold text-xs flex items-center justify-center gap-2 transition duration-200 shadow-sm bg-slate-100 text-slate-400 border border-slate-200 cursor-not-allowed";
+      } else if (esAmbar) {
+        // Estado ÁMBAR: Riesgo
+        contenedor.className = "p-5 md:p-6 rounded-2xl border transition-all duration-300 shadow-sm bg-amber-50 border-amber-300";
+        circulo.className = "w-14 h-14 rounded-2xl flex items-center justify-center text-white text-2xl shadow-md bg-amber-500";
+        circulo.innerHTML = '<i class="fa-solid fa-triangle-exclamation"></i>';
+        badge.className = "text-[11px] font-black uppercase tracking-wider px-3 py-1 rounded-full bg-amber-100 text-amber-800 border border-amber-200";
+        badge.innerText = "RIESGO DE DÉFICIT OPERACIONAL";
+        titulo.innerText = "Fricción Logística: Pérdida de Compensación Variable";
+        descrip.innerText = `Se evidencia un déficit de ${Math.abs(brechaDiaria).toFixed(1)} h o demoras en transporte público (${tiempoTraslado.toFixed(1)} h). Se compromete el margen de ganancia de horas adicionales.`;
+        textoBrecha.className = "text-2xl font-black text-amber-700";
+
+        badgeMes.className = "text-xs px-3 py-1 rounded-full font-bold bg-amber-100 text-amber-800";
+        badgeMes.innerText = "En Riesgo Contractual";
+
+        btnPoka.disabled = false;
+        btnPoka.className = "w-full py-3 px-4 rounded-xl font-bold text-xs flex items-center justify-center gap-2 transition duration-200 shadow-md bg-amber-600 hover:bg-amber-500 text-white cursor-pointer";
+      } else {
+        // Estado ROJO: Falla Crítica (END)
+        contenedor.className = "p-5 md:p-6 rounded-2xl border transition-all duration-300 shadow-sm bg-red-50 border-red-300";
+        circulo.className = "w-14 h-14 rounded-2xl flex items-center justify-center text-white text-2xl shadow-md bg-red-600 animate-pulse";
+        circulo.innerHTML = '<i class="fa-solid fa-xmark"></i>';
+        badge.className = "text-[11px] font-black uppercase tracking-wider px-3 py-1 rounded-full bg-red-100 text-red-800 border border-red-200";
+        badge.innerText = "DESVIACIÓN CRÍTICA (END ACTIVADO)";
+        titulo.innerText = "Poka-Yoke: Ruta Inviable y Caída Bajo Meta Mínima";
+        descrip.innerText = `Déficit severo de horas in situ (${brechaDiaria.toFixed(1)} h) o traslados excesivos (${tiempoTraslado.toFixed(1)} h). Riesgo directo de caer bajo 160.5 h y perder el 100% de horas extras del mes.`;
+        textoBrecha.className = "text-2xl font-black text-red-700";
+
+        badgeMes.className = "text-xs px-3 py-1 rounded-full font-bold bg-red-100 text-red-800";
+        badgeMes.innerText = "Incumplimiento (END)";
+
+        btnPoka.disabled = false;
+        btnPoka.className = "w-full py-3 px-4 rounded-xl font-bold text-xs flex items-center justify-center gap-2 transition duration-200 shadow-md bg-red-600 hover:bg-red-500 text-white cursor-pointer animate-bounce";
+      }
+
+      // 7. Actualizar gráfico Chart.js
+      actualizarGrafico(horasSitio, tiempoTraslado, metaDiaria);
+    }
+
+    // Función para renderizar el gráfico Chart.js
+    function actualizarGrafico(sitio, traslado, meta) {
+      const ctx = document.getElementById("graficoBalance").getContext("2d");
+      const dataValues = [sitio, traslado, meta];
+
+      if (chartInstancia) {
+        chartInstancia.data.datasets[0].data = dataValues;
+        chartInstancia.update();
+      } else {
+        chartInstancia = new Chart(ctx, {
+          type: "bar",
+          data: {
+            labels: ["Horas In Situ (Reportables)", "Tiempo Transporte (No Reportable)", "Meta Requerida del Día"],
+            datasets: [{
+              label: "Horas de la Jornada",
+              data: dataValues,
+              backgroundColor: ["#2563EB", "#D97706", "#059669"],
+              borderRadius: 8
+            }]
+          },
+          options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+              legend: { display: false }
+            },
+            scales: {
+              y: {
+                beginAtZero: true,
+                max: 12,
+                ticks: { font: { size: 10 } }
+              },
+              x: {
+                ticks: { font: { size: 10 } }
+              }
+            }
+          }
+        });
+      }
+    }
+
+    // Funciones del Modal Poka-Yoke (Wizard)
+    function abrirModalPokaYoke() {
+      const modal = document.getElementById("modalPokaYoke");
+      modal.classList.remove("hidden");
+      modal.classList.add("flex");
+    }
+
+    function cerrarModalPokaYoke() {
+      const modal = document.getElementById("modalPokaYoke");
+      modal.classList.add("hidden");
+      modal.classList.remove("flex");
+    }
+
+    // Función de exportación de reporte CSV (Bono de Innovación 1)
+    function exportarReporteAuditoriaCSV() {
+      const tipoDia = document.getElementById("tipoDia").value;
+      const nivelMeta = document.getElementById("nivelMeta").value;
+      const horasSitio = document.getElementById("sliderHorasSitio").value;
+      const tiempoTraslado = document.getElementById("sliderTiempoTraslado").value;
+      const totalMes = document.getElementById("totalHorasMesProyectadas").innerText;
+      const incentivo = document.getElementById("totalIncentivoMesPesos").innerText;
+      const lucro = document.getElementById("totalLucroCesanteMesPesos").innerText;
+      const estado = document.getElementById("badgeEstadoSemaforo").innerText;
+
+      const csvRows = [
+        ["REPORTE DE AUDITORIA OPERACIONAL - OPTIRUTA SST"],
+        ["Fecha de Generacion", new Date().toLocaleString()],
+        ["Estudiante", "Neiris Marcela Pallares Carreno"],
+        ["Docente", "Alessandro Villanueva Cantillo"],
+        ["Modulo", "IA para la Gestion de la Calidad"],
+        [""],
+        ["VARIABLE OPERACIONAL", "VALOR SIMULADO", "CONDICION TECNICA"],
+        ["Tipo de Jornada", tipoDia, "Noviembre (23 dias laborables)"],
+        ["Nivel de Meta Seleccionado", nivelMeta, "Minimo 160.5h para habilitar extras"],
+        ["Horas In Situ de Asesoria SST", horasSitio + " h", "Tiempo presencial validado con cliente"],
+        ["Tiempo en Transporte Publico", tiempoTraslado + " h", "Tiempo no computable (Max 2.0h tolerado)"],
+        ["Estado del Semaforo", estado, "Diagnostico PCO-1 y PCO-2"],
+        ["Total Horas Mes Proyectadas", totalMes, "Umbral minimo 160.5 h"],
+        ["Incentivo por Horas Adicionales", incentivo, "Tarifa contractual $15.000 COP / hora"],
+        ["Lucro Cesante Estimado", lucro, "Perdida por friccion de transporte masivo"],
+        ["Costo de No Calidad por Evento (Cu)", "$ 50.000 COP", "END: Deficit de horas in situ"]
+      ];
+
+      const csvContent = "data:text/csv;charset=utf-8," + csvRows.map(e => e.join(",")).join("\n");
+      const encodedUri = encodeURI(csvContent);
+      const link = document.createElement("a");
+      link.setAttribute("href", encodedUri);
+      link.setAttribute("download", `Auditoria_OptiRuta_SST_${tipoDia}_${Date.now()}.csv`);
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    }
+
+    // Inicializar simulación al cargar la página
+    window.onload = ejecutarSimulacion;
+  </script>
+</body>
+</html>
